@@ -1,0 +1,42 @@
+mod_scrambleip - scramble information about the remote IP
+
+This module scrambles the information on the remote IP and
+hostname right at the beginning of handling the request.  That means
+the clear IP is not logged, is not available to any web apps, and can't leak
+into error logs and the like.
+
+Its written as an lighter approach to mod_removeip which sets every request to
+localhost/127.0.0.1.
+
+mod_scrambleip uses the following method:
+
+IPv4: The first 4 bytes are kept, bytes 5+6 are XORed with 0x55, the last ones with 0xAA
+IPV6: First block is kept, the second and last block are removed and always set to 0, 
+      the blocks in between are XORed with 0x5A
+
+There is currently no facility for enabling the module on a per site
+or per directory basis.
+
+Compile and install for Apache2:
+make scrambleip
+make install
+
+config should look for example like this:
+
+/etc/apache2/modules.d/99_scrambleip.conf 
+LoadModule scrambleip_module    modules/mod_scrambleip.so
+SCRAMBLEIPenable On
+
+Author:
+Florian Knodt <git@adlerweb.info>
+Based on mod_removeip by Andrew McNaughton <andrew@scoop.co.nz>
+Based on mod_rpaf by Thomas Eibner <thomas@stderr.net>
+Based on Cexplode by Maz <http://maz-programmersdiary.blogspot.com/>
+
+License:
+Apache License
+
+Note:
+Beware! This code was written after midnight using more beer than C-skills.
+Please dont use it on productive systems without cleaning up this mess ;)
+
