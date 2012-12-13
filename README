@@ -40,3 +40,9 @@ Note:
 Beware! This code was written after midnight using more beer than C-skills.
 Please dont use it on productive systems without cleaning up this mess ;)
 
+Note2:
+This code is NOT related to http://sourceforge.net/projects/modscrambleip/
+I found this after this module was created and didn't want to rename
+everything again. As far as i could see the Code on SF doesn't support
+IPv6 so maybe this project is still helpful.
+
