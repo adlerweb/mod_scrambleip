@@ -17,7 +17,6 @@
  *                                                          			*
  *      Revision History:                                   			*
  *																		*
- * 		- 0.0.6 20.09.2011/Maz  Fixed atomic CAS again						*
  * 		- 0.0.6 15.08.2009/Maz  Fixed atomic CAS						*
  * 		- 0.0.5 11.08.2009/Maz  Added Cexplode_free_allButPieces		*
  *  	- 0.0.4 11.08.2009/Maz  Added atomic ops and 					*
@@ -30,26 +29,13 @@
  *                                                          			*/
 /* ******************************************************************** */
 
-#ifndef HELPERS_H
-#define HELPERS_H
+#ifndef MBOT_CEXPLODE_H
+#define MBOT_CEXPLODE_H
 
 /* Some Cexplode calls support using this special item define */
 #define CEXPLODE_LAST_ITEM 0xFFFFFFFF
 
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <semaphore.h>
-
-/**
- * @brief Struct for 32bit wide integer type used in atomic operations
- */
-typedef struct MbotAtomic32 
-{
-	volatile unsigned int value;
-	sem_t sem;		///< If non x86 arch is used, these atomic ops are dummies using semaphore
-}MbotAtomic32;
-
+#include <sys/types.h>
 
 /**
  * @brief Struct for Cexplode object
@@ -214,208 +200,8 @@ int Cexplode_sepwasatend(CexplodeStrings exp_obj);
  */
 int Cexplode_concat(CexplodeStrings *first,CexplodeStrings *second);
 
-
-/**
- * \brief removes trimchars from the beginning of a string.
- * \returns number of characters removed
- * */
-int mbot_ltrim(char *text, char trimchar);
-
-/**
- * \brief removes trailing trimchars from a string.
- * \returns number of characters removed
- * */
-int mbot_rtrim(char *text, char trimchar);
-
-/**
- * \brief removes trailing trimchars as well as trimchars from the beginning of a string.
- * \returns number of characters removed
- * */
-int mbot_lrtrim(char *text, char trimchar);
-
-/**
- * \brief removes all trimchars from a string.
- * \returns number of characters removed
- * */
-int mbot_trimall(char *text, char trimchar);
-
-/**
- * @brief Creates 32bit atomic variable, compatible with mbot_atomic* operations
- */
-MbotAtomic32 * MbotAtomic32Init();
-/**
- * @brief Uninitializes MbotAtomic32. This must not be called when it is possible someone is using the variable 
- * @warning If non x86 arch is used, these atomic ops are ineffective dummies using a huge semaphore (provided only for compatibility). On x86 arch compile with define ARCH_x86
- */
-void MbotAtomic32Uninit(MbotAtomic32 **_this_);
-/**
- * @brief Get the value atomically 
- * @warning If non x86 arch is used, these atomic ops are ineffective dummies using a huge semaphore (provided only for compatibility). On x86 arch compile with define ARCH_x86
- * */
-unsigned int mbot_atomicGet(MbotAtomic32* atomic);
-
-/**
- * @brief Increase value atomically - returns value before increment 
- * @warning If non x86 arch is used, these atomic ops are ineffective dummies using a huge semaphore (provided only for compatibility). On x86 arch compile with define ARCH_x86
- * */
-unsigned int mbot_atomicAdd(MbotAtomic32* atomic,unsigned int addition);
-
-/**
- * @brief Decrease value atomically - returns value before decrement 
- * @warning If non x86 arch is used, these atomic ops are ineffective dummies using a huge semaphore (provided only for compatibility). On x86 arch compile with define ARCH_x86
- * */
-unsigned int mbot_atomicDec(MbotAtomic32* atomic,unsigned int decrement);
+char *Cexplode_getbyid(CexplodeStrings *exp_obj, int index);
 
 
+#endif //MBOT_CEXPLODE_H
 
-unsigned int mbot_atomicIncIfNequal(MbotAtomic32* atomic,unsigned int addition, unsigned int cmp);
-unsigned int mbot_atomicIncIfEqual(MbotAtomic32* atomic,unsigned int decrement, unsigned int cmp);
-
-
-/**
- * @brief Decrease value atomically, if original value is greater than cmp. Returns original value. (If returnval<cmp, no decrement occurred 
- * @warning If non x86 arch is used, these atomic ops are ineffective dummies using a huge semaphore (provided only for compatibility). On x86 arch compile with define ARCH_x86
- * */
-unsigned int mbot_atomicDecIfGreater(MbotAtomic32* atomic,unsigned int decrement, unsigned int cmp);
-
-/**
- * @brief Decrease value atomically, if original value is smaller than cmp. Returns original value. (If returnval>cmp, no decrement occurred 
- * @warning If non x86 arch is used, these atomic ops are ineffective dummies using a huge semaphore (provided only for compatibility). On x86 arch compile with define ARCH_x86
- * */
-unsigned int mbot_atomicDecIfSmaller(MbotAtomic32* atomic,unsigned int decrement, unsigned int cmp);
-
-/**
- * @brief Increase value atomically, if original value is greater than cmp. Returns original value. (If returnval<cmp, no increment occurred 
- * @warning If non x86 arch is used, these atomic ops are ineffective dummies using a huge semaphore (provided only for compatibility). On x86 arch compile with define ARCH_x86
- * */
-unsigned int mbot_atomicIncIfGreater(MbotAtomic32* atomic,unsigned int decrement, unsigned int cmp);
-
-/**
- * @brief Increase value atomically, if original value is smaller than cmp. Returns original value. (If returnval>cmp, no increment occurred 
- * @warning If non x86 arch is used, these atomic ops are ineffective dummies using a huge semaphore (provided only for compatibility). On x86 arch compile with define ARCH_x86
- * */
-unsigned int mbot_atomicIncIfSmaller(MbotAtomic32* atomic,unsigned int decrement, unsigned int cmp);
-
-#ifdef ARCH_x86
-/**
- * @brief Performs atomic compare and swap - If original value was equal to param old, value of atomic variable is set to newval. Returns the atomic value before the operation (If returnvalue is old => swap occurred ) 
- * Should really be atomix on x86 platform, on other platforms these atomic operations are not usefull, they shall lean on semaphores ( just dummy implementations)
- * */
-static __inline__ unsigned int mbot_atomicCAS(MbotAtomic32* atomic, unsigned int old, unsigned int newval)
-{
-    int res=old;
-	__asm__ __volatile__(
-    "lock  cmpxchgl %1,%2; \n\t" /* Swap value comp equals */
-    : "+a" (res)    /* %0, old value to cmp - returns success */
-	: "r"(newval),  /* %1, new value to set */
-	  "m"(atomic->value) /* Memory address */
-	: "memory");
-
-	return res;
-} 
-/*
-__inline__ unsigned int mbot_atomicCAS(MbotAtomic32* atomic, unsigned int old, unsigned int newval)
-{
-	__asm__ __volatile__(
-	"lock cmpxchgl %w0,%1" 
-	: "+r"(newval)
-	: "m"(atomic->value), "a"(old)
-	: "memory");
-
-	return old;
-} 
-*/
-#else
-unsigned int mbot_atomicCAS(MbotAtomic32* atomic, unsigned int old, unsigned int newval);
-#endif
-
-/* Containers */
-
-typedef struct mbot_linkedList
-{
-    struct mbot_linkedList *head;
-    struct mbot_linkedList *next;
-    struct mbot_linkedList *prev;
-    void *data;
-}mbot_linkedList;
-
-/**
- * @brief Initializes linked list for use - returns ptr to list head 
- * */
-mbot_linkedList *mbot_ll_init();
-/**
- * @brief Gets previous list item. - returns previous item, or NULL if error occurred/first item given as param 
- * */
-mbot_linkedList * mbot_ll_get_prev(mbot_linkedList *_this);
-/**
- * @brief Get the head of the list 
- * Head can be used to maintain the location of empty list 
- * @return the head, and NULL on error 
- * @warning HEAD IS NOT SUPPOSED TO BE USED AS STORING ELEMENT! 
- * */
-mbot_linkedList * mbot_ll_head_get(mbot_linkedList *_this);
-
-/**
- * @brief Get's next element - NULL if error occurred, or last element was provided as argument 
- * */
-mbot_linkedList * mbot_ll_get_next(mbot_linkedList *_this);
-
-/**
- * @brief Get's the first list element - returns first element or NULL if no elements stored, or if an error occurred 
- * */
-mbot_linkedList * mbot_ll_get_first(mbot_linkedList *_this);
-
-/**
- * @brief Gets the last element in list 
- * */
-mbot_linkedList * mbot_ll_get_last(mbot_linkedList *_this);
-
-/**
- * @brief Adds item to list (data). Does not do a copy of data. Any list item (including head) can be used as _this 
- * @return list entry corresponding to stored data 
- * */
-mbot_linkedList * mbot_ll_add(mbot_linkedList *_this,void *data);
-
-/**
- * @brief removes given item from list - does not free memory. 
- * @return removed list entry, and user must call free upon entry and stored data. 
- * */
-mbot_linkedList * mbot_ll_release(mbot_linkedList *_this);
-
-/**
- * @brief removes list item which holds data pointed by data. 
- * Any list item can be given in _this. Does not free memory. Returns removed list entry, and user must call free upon entry and stored data.
- * @return removed list entry
- * */
-mbot_linkedList * mbot_ll_safe_release(mbot_linkedList *_this,void *data);
-
-/**
- * @brief Gets data stored to an entry - entry and data are left untouched 
- */
-void * mbot_ll_dataGet(mbot_linkedList *_this);
-/**
- * @brief Sets data to an list, 
- * @return previous data 
- * @warning - this should be avoided. Malicious use may corrupt the list! 
- * */
-void * mbot_ll_dataSet(mbot_linkedList *_this,void *data);
-
-/**
- * @brief Searchs through the list and returns element in which the held data matches data specified in params
- * @warning, all elements must contain at least as much data as specified in size_t datasize! 
- */
-mbot_linkedList * mbot_ll_seek(mbot_linkedList *_this, void *data, size_t datasize);
-
-/**
- * @brief Copies given list and itemsize bytes of data from each container to new list, and returns a pointer to the copylist 
- * @return a pointer to the copylist and NULL on error 
- * @warning This assumes that each "container" in list holds at least itemsize bytes of data - and copies exactly itemsize bytes.
- * @warning Usable really only for lists which hold fixed size items!
- */
-mbot_linkedList *mbot_ll_copylist_wdata(mbot_linkedList *old,size_t itemsize);
-
-/**
- * @brief Frees all entries from list, and destroys the list - does not free stored data. _this is NULLed upon return
- * */
-void  mbot_ll_destroy(mbot_linkedList **_this);
-#endif

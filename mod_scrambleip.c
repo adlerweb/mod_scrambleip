@@ -17,6 +17,10 @@
 #include "http_protocol.h"
 #include "http_vhost.h"
 #include "apr_strings.h"
+#include "MbotCexplode.h"
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
 module AP_MODULE_DECLARE_DATA scrambleip_module;
 
@@ -52,19 +56,61 @@ static const char *scrambleip_enable(cmd_parms *cmd, void *dummy, int flag) {
 static int change_remote_ip(request_rec *r) {
     const char *fwdvalue;
     char *val;
+
+    CexplodeStrings ploder;
+    int matches;
+    char newip[41]; //40 = IPv6
+    char tmp[5];
+    int i,scrambled;
+
     scrambleip_server_cfg *cfg = (scrambleip_server_cfg *)ap_get_module_config(r->server->module_config,
                                                                    &scrambleip_module);
 
     if (!cfg->enable)
         return DECLINED;
 
-    scrambleip_cleanup_rec *rcr = (scrambleip_cleanup_rec *)apr_pcalloc(r->pool, sizeof(scrambleip_cleanup_rec));
-    rcr->old_ip = apr_pstrdup(r->connection->pool, r->connection->remote_ip);
-    rcr->old_host = apr_pstrdup(r->connection->pool, r->connection->remote_addr->sa.sin.sin_addr.s_addr);
-    rcr->r = r;
+    strcpy(newip, apr_pstrdup(r->connection->pool, r->connection->remote_ip));
+    scrambled=0;
+    
+    //IPv4
+    Cexplode(apr_pstrdup(r->connection->pool, r->connection->remote_ip),".",&ploder);
+    matches = Cexplode_getAmnt(ploder);
+    //printf("Found %d matches for IPv4\n", matches);
 
-    r->connection->remote_ip = apr_pstrdup(r->connection->pool, rcr->old_ip);
-    r->connection->remote_addr->sa.sin.sin_addr.s_addr = apr_pstrdup(r->connection->pool, rcr->old_host);
+    if(matches == 4) {
+        //printf("This looks like IPv4\n");
+
+	sprintf(newip, "%s.%s.%d.%d", Cexplode_getbyid(&ploder, 0), Cexplode_getbyid(&ploder, 1), (atoi(Cexplode_getbyid(&ploder, 2)) & 0x55), (atoi(Cexplode_getbyid(&ploder, 3)) & 0xAA));
+	scrambled=1;
+    }
+    Cexplode_free(ploder);
+
+    //IPv6
+    Cexplode(apr_pstrdup(r->connection->pool, r->connection->remote_ip),":",&ploder);
+    matches = Cexplode_getAmnt(ploder);
+    //printf("Found %d matches for IPv6\n", matches);
+    if(matches >= 2) {
+        //printf("This looks like IPv6\n");
+	sprintf(newip, "%s:0:", Cexplode_getbyid(&ploder, 0));
+
+	for(i=2; i<(matches-1); i++) {
+		sprintf(tmp, "%d", atoi(Cexplode_getbyid(&ploder, i)) & 0x5A);
+		strcat(newip, tmp);
+		strcat(newip, ":");
+	}
+	strcat(newip, "0");
+	scrambled=1;
+    }
+    Cexplode_free(ploder);
+
+    //Format unknown - set IP to localhost
+    if(scrambled < 1) {
+        //printf("No IP\n");
+	sprintf(newip, "::1");
+    }
+
+    r->connection->remote_ip = apr_pstrdup(r->connection->pool, newip);
+    r->connection->remote_addr->sa.sin.sin_addr.s_addr = inet_addr(newip);
 
     return DECLINED;
 }

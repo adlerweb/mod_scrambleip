@@ -19,7 +19,7 @@ scrambleip: mod_scrambleip.o
 	@echo make done, type \"make install\" to install mod_scrambleip-2.0
 
 mod_scrambleip.o: mod_scrambleip.c
-	$(APXS2) -c -n $@ mod_scrambleip.c
+	$(APXS2) -c -n $@ mod_scrambleip.c MbotCexplode.c
 
 mod_scrambleip.c:
 
