@@ -17,9 +17,11 @@ IPV6: First block is kept, the second and last block are removed and always set 
 There is currently no facility for enabling the module on a per site
 or per directory basis.
 
-Compile and install for Apache2:
+Compile and install for Apache2.4:
 make scrambleip
 make install
+
+For Apache-versions below 2.4 see the corresponding branch.
 
 config should look for example like this:
 

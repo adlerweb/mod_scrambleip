@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <arpa/inet.h>
 
 module AP_MODULE_DECLARE_DATA scrambleip_module;
 
@@ -53,7 +54,7 @@ static const char *scrambleip_enable(cmd_parms *cmd, void *dummy, int flag) {
     return NULL;
 }
 
-static int change_remote_ip(request_rec *r) {
+static int change_client_ip(request_rec *r) {
     const char *fwdvalue;
     char *val;
 
@@ -69,11 +70,11 @@ static int change_remote_ip(request_rec *r) {
     if (!cfg->enable)
         return DECLINED;
 
-    strcpy(newip, apr_pstrdup(r->connection->pool, r->connection->remote_ip));
+    strcpy(newip, apr_pstrdup(r->connection->pool, r->connection->client_ip));
     scrambled=0;
     
     //IPv4
-    Cexplode(apr_pstrdup(r->connection->pool, r->connection->remote_ip),".",&ploder);
+    Cexplode(apr_pstrdup(r->connection->pool, r->connection->client_ip),".",&ploder);
     matches = Cexplode_getAmnt(ploder);
     //printf("Found %d matches for IPv4\n", matches);
 
@@ -86,7 +87,7 @@ static int change_remote_ip(request_rec *r) {
     Cexplode_free(ploder);
 
     //IPv6
-    Cexplode(apr_pstrdup(r->connection->pool, r->connection->remote_ip),":",&ploder);
+    Cexplode(apr_pstrdup(r->connection->pool, r->connection->client_ip),":",&ploder);
     matches = Cexplode_getAmnt(ploder);
     //printf("Found %d matches for IPv6\n", matches);
     if(matches >= 2) {
@@ -109,8 +110,8 @@ static int change_remote_ip(request_rec *r) {
 	sprintf(newip, "::1");
     }
 
-    r->connection->remote_ip = apr_pstrdup(r->connection->pool, newip);
-    r->connection->remote_addr->sa.sin.sin_addr.s_addr = inet_addr(newip);
+    r->connection->client_ip = apr_pstrdup(r->connection->pool, newip);
+    r->connection->client_addr->sa.sin.sin_addr.s_addr = inet_addr(newip);
 
     return DECLINED;
 }
@@ -127,7 +128,7 @@ static const command_rec scrambleip_cmds[] = {
 };
 
 static void register_hooks(apr_pool_t *p) {
-    ap_hook_post_read_request(change_remote_ip, NULL, NULL, APR_HOOK_MIDDLE);
+    ap_hook_post_read_request(change_client_ip, NULL, NULL, APR_HOOK_MIDDLE);
 }
 
 module AP_MODULE_DECLARE_DATA scrambleip_module = {
